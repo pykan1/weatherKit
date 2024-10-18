@@ -17,7 +17,6 @@ import com.example.weather.ui.theme.WeatherTheme
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        enableEdgeToEdge()
         setContent {
             WeatherTheme {
                 SetupNavHost()

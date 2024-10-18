@@ -15,9 +15,12 @@ import kotlinx.coroutines.launch
 open class BaseViewModel<S>(private val initState: S) : ViewModel() {
 
     val stateFlow = MutableStateFlow(initState)
-    val state = stateFlow.value
+    protected val state: S
+        get() = stateFlow.value
+
     fun reduce(reduce: () -> S) {
         viewModelScope.launch {
+            println("reduce - ${reduce.invoke()}")
             stateFlow.update { reduce() }
         }
     }

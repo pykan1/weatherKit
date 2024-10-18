@@ -25,7 +25,7 @@ fun SetupNavHost() {
     ) {
 
         composable(route = Screen.MainScreen.screen) {
-            MainScreen()
+            MainScreen(3, "sa")
         }
 
         composable(route = Screen.MapScreen.screen) {
