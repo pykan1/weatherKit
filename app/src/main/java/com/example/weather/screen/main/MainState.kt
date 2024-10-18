@@ -15,6 +15,6 @@ data class MainState(
     val loading: Boolean,
 ) {
     companion object {
-        val InitState = MainState(MeasurementTimeRangeUI.Default, emptyList(), Date(), Date(), 5, emptyList(), true)
+        val InitState = MainState(MeasurementTimeRangeUI.Default, emptyList(), Date(), Date(), 20, emptyList(), true)
     }
 }
