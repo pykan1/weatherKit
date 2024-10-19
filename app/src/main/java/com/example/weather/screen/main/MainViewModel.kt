@@ -11,14 +11,15 @@ import com.example.weather.screen.base.BaseViewModel
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
+import java.util.Date
 
 class MainViewModel() :
     BaseViewModel<MainState>(MainState.InitState) {
     private val weatherApi: WeatherService = ApiModule.provideApi()
-    var job: Job? = null
+    var jobChangePoint: Job? = null
     fun changePoints(points: Int) {
-        job?.cancel()
-        job = viewModelScope.launch {
+        jobChangePoint?.cancel()
+        jobChangePoint = viewModelScope.launch {
             delay(300L)
             reduce {
                 state.copy(
@@ -29,16 +30,30 @@ class MainViewModel() :
         }
     }
 
-
-    fun changeDateRange(points: Int = state.points) {
-        println("changeDateRange")
+    fun changeDate(startDate: Date = state.dateStart, endDate: Date = state.dateEnd) {
+        println("endDate - $endDate")
         viewModelScope.launch {
-            reduce { state.copy(loading = true) }
+            reduce {
+                state.copy(
+                    dateStart = startDate,
+                    dateEnd = endDate
+                )
+            }
+            changeDateRange(startDate = startDate, endDate = endDate)
+        }
+    }
 
+    var jobChangeRange: Job? = null
+    fun changeDateRange(points: Int = state.points, endDate: Date = state.dateEnd, startDate: Date = state.dateStart) {
+        println("changeDateRange")
+        jobChangeRange?.cancel()
+        jobChangeRange = viewModelScope.launch {
+            reduce { state.copy(loading = true) }
+            delay(300L)
             val dates = generateEqualDates(
                 allDays = state.daily,
-                dateFrom = state.dateStart,
-                dateTo = state.dateEnd,
+                dateFrom = startDate,
+                dateTo = endDate,
                 points = points
             )
             println("dates - $dates")
