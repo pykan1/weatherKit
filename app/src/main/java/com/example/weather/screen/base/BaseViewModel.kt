@@ -20,7 +20,6 @@ open class BaseViewModel<S>(private val initState: S) : ViewModel() {
 
     fun reduce(reduce: () -> S) {
         viewModelScope.launch {
-            println("reduce - ${reduce.invoke()}")
             stateFlow.update { reduce() }
         }
     }

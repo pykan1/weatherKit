@@ -91,7 +91,8 @@ fun MainScreen(city: Int, cityName: String) {
             .verticalScroll(
                 rememberScrollState()
             )
-            .fillMaxSize().animateContentSize()
+            .fillMaxSize()
+            .animateContentSize()
     ) {
 
         Spacer(modifier = Modifier.size(30.dp))
@@ -478,7 +479,6 @@ fun TemperatureGraph(datesByPoints: List<DailyUI>) {
 
     // Определяем количество шагов по Y с шагом 5
     val steps = ceil(((maxTemp - minTemp) / 5)).toInt()
-
     Row(
         modifier = Modifier
             .fillMaxWidth()
@@ -486,7 +486,7 @@ fun TemperatureGraph(datesByPoints: List<DailyUI>) {
     ) {
         // Ось Y с подписями температур
         Canvas(
-            modifier = Modifier
+            modifier = Modifier.padding(top = pointWidth)
                 .fillMaxHeight()
                 .width(40.dp)
                 .height(pointWidth * steps)
@@ -511,7 +511,7 @@ fun TemperatureGraph(datesByPoints: List<DailyUI>) {
             }
         }
 
-        // Основной график с прямоугольниками по температуре сверху
+        // Основной график
         LazyRow(
             state = state,
             modifier = Modifier
@@ -522,10 +522,8 @@ fun TemperatureGraph(datesByPoints: List<DailyUI>) {
                 val point = datesByPoints[index]
                 val nextPoint = datesByPoints.getOrNull(index + 1)
 
-                Column(modifier = Modifier.height(pointWidth * steps + 80.dp)) {
-
-
-                    Canvas(modifier = Modifier.size(pointWidth, 30.dp)) {
+                Box(modifier = Modifier.height(pointWidth * steps + 80.dp)) {
+                    Canvas(modifier = Modifier.size(pointWidth, pointWidth)) {
                         // Рассчитываем цвет температуры (градиент от синего к красному)
                         val tempRatio =
                             ((point.temperature - minTemp) / (maxTemp - minTemp)).toFloat()
@@ -538,7 +536,7 @@ fun TemperatureGraph(datesByPoints: List<DailyUI>) {
                         )
                     }
                     Canvas(
-                        modifier = Modifier.size(pointWidth, pointWidth * steps)
+                        modifier = Modifier.padding(top = pointWidth).size(pointWidth, pointWidth * steps)
                     ) {
                         // Правильное позиционирование точки на графике
                         val temperatureRange = maxTemp - minTemp
@@ -586,7 +584,6 @@ fun TemperatureGraph(datesByPoints: List<DailyUI>) {
                             )
                         }
 
-                        // Отображаем даты
                         drawContext.canvas.nativeCanvas.apply {
                             save()
                             rotate(90f, size.width / 2, size.height + 70f)
@@ -608,6 +605,7 @@ fun TemperatureGraph(datesByPoints: List<DailyUI>) {
         }
     }
 }
+
 
 fun Date.toUI(): String {
     val dateFormat = SimpleDateFormat("dd.MM.yyyy")
