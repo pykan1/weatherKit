@@ -50,7 +50,9 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.lerp
 import androidx.compose.ui.graphics.nativeCanvas
 import androidx.compose.ui.text.drawText
 import androidx.compose.ui.text.font.FontWeight
@@ -175,6 +177,21 @@ fun MainScreen(city: Int, cityName: String) {
                     }
                 }
                 val selectedStep = sliderValue.roundToInt()
+
+                if (!state.loading) {
+                    TemperatureGraph(datesByPoints = state.datesByPoints)
+                } else {
+                    Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                        CircularProgressIndicator(
+                            modifier = Modifier
+                                .align(Alignment.Center)
+                                .size(80.dp)
+                        )
+                    }
+                }
+
+                Spacer(modifier = Modifier.size(30.dp))
+
                 Row(
                     verticalAlignment = Alignment.CenterVertically,
                     modifier = Modifier.padding(horizontal = 16.dp),
@@ -300,18 +317,6 @@ fun MainScreen(city: Int, cityName: String) {
                                 }
                             },
                     )
-                }
-                if (!state.loading) {
-                    Spacer(modifier = Modifier.size(30.dp))
-                    TemperatureGraph(datesByPoints = state.datesByPoints)
-                } else {
-                    Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                        CircularProgressIndicator(
-                            modifier = Modifier
-                                .align(Alignment.Center)
-                                .size(80.dp)
-                        )
-                    }
                 }
                 if (openStartDialog) {
                     val confirmEnabled = remember {
@@ -505,18 +510,32 @@ fun TemperatureGraph(datesByPoints: List<DailyUI>) {
             }
         }
 
-        // Основной график
+        // Основной график с прямоугольниками по температуре сверху
         LazyRow(
             state = state,
             modifier = Modifier
                 .fillMaxWidth()
-                .height(pointWidth * steps + 50.dp) // Высота увеличена для осей
+                .height(pointWidth * steps + 80.dp) // Высота увеличена для осей
         ) {
             items(datesByPoints.size) { index ->
                 val point = datesByPoints[index]
                 val nextPoint = datesByPoints.getOrNull(index + 1)
 
-                Box(modifier = Modifier.height(pointWidth * steps + 50.dp)) {
+                Column(modifier = Modifier.height(pointWidth * steps + 80.dp)) {
+
+
+                    Canvas(modifier = Modifier.size(pointWidth, 30.dp)) {
+                        // Рассчитываем цвет температуры (градиент от синего к красному)
+                        val tempRatio =
+                            ((point.temperature - minTemp) / (maxTemp - minTemp)).toFloat()
+                        val color = lerp(Color.Blue, Color.Red, tempRatio)
+
+                        // Рисуем прямоугольник
+                        drawRect(
+                            color = color,
+                            size = Size(size.width, size.height)
+                        )
+                    }
                     Canvas(
                         modifier = Modifier.size(pointWidth, pointWidth * steps)
                     ) {
@@ -566,6 +585,7 @@ fun TemperatureGraph(datesByPoints: List<DailyUI>) {
                             )
                         }
 
+                        // Отображаем даты
                         drawContext.canvas.nativeCanvas.apply {
                             save()
                             rotate(90f, size.width / 2, size.height + 70f)
