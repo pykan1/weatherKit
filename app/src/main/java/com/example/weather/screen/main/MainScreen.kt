@@ -91,7 +91,7 @@ fun MainScreen(city: Int, cityName: String) {
             .verticalScroll(
                 rememberScrollState()
             )
-            .fillMaxSize()
+            .fillMaxSize().animateContentSize()
     ) {
 
         Spacer(modifier = Modifier.size(30.dp))
@@ -177,6 +177,7 @@ fun MainScreen(city: Int, cityName: String) {
                     }
                 }
                 val selectedStep = sliderValue.roundToInt()
+                Spacer(modifier = Modifier.size(20.dp))
 
                 if (!state.loading) {
                     TemperatureGraph(datesByPoints = state.datesByPoints)
@@ -190,7 +191,7 @@ fun MainScreen(city: Int, cityName: String) {
                     }
                 }
 
-                Spacer(modifier = Modifier.size(30.dp))
+                Spacer(modifier = Modifier.size(20.dp))
 
                 Row(
                     verticalAlignment = Alignment.CenterVertically,
