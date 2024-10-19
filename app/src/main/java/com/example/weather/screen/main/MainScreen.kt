@@ -62,6 +62,7 @@ import com.example.weather.models.DailyUI
 import com.example.weather.models.orEmpty
 import java.text.SimpleDateFormat
 import java.time.Instant
+import java.util.Calendar
 import java.util.Date
 import kotlin.math.abs
 import kotlin.math.ceil
@@ -108,7 +109,7 @@ fun MainScreen(city: Int, cityName: String) {
         if (state.daily.isNotEmpty()) {
             if (state.points != 0) {
                 var sliderStartValue by remember { mutableFloatStateOf(0f) }
-                var sliderEndValue by remember { mutableFloatStateOf((state.daily.size-1).toFloat()) }
+                var sliderEndValue by remember { mutableFloatStateOf((state.daily.size - 1).toFloat()) }
                 val startDatePickerState = rememberDatePickerState(
                     initialSelectedDateMillis = state.dateStart.time
                 )
@@ -120,7 +121,7 @@ fun MainScreen(city: Int, cityName: String) {
                     mutableStateOf(
                         SliderState(
                             value = state.points.toFloat(),
-                            valueRange = 0f..state.daily.size.toFloat(),
+                            valueRange = 1f..state.daily.size.toFloat(),
                             onValueChangeFinished = {
                             },
                             steps = state.daily.size - 1
@@ -161,6 +162,7 @@ fun MainScreen(city: Int, cityName: String) {
                 LaunchedEffect(sliderStartState.value) {
                     sliderStartValue = sliderStartState.value
                     state.daily.getOrNull(sliderStartState.value.roundToInt())?.let {
+                        startDatePickerState.selectedDateMillis = it.ts.time
                         viewModel.changeDate(startDate = it.ts)
                     }
                 }
@@ -168,6 +170,7 @@ fun MainScreen(city: Int, cityName: String) {
                 LaunchedEffect(sliderEndState.value) {
                     sliderEndValue = sliderEndState.value
                     state.daily.getOrNull(sliderEndState.value.roundToInt())?.let {
+                        endDatePickerState.selectedDateMillis = it.ts.time
                         viewModel.changeDate(endDate = it.ts)
                     }
                 }
@@ -324,7 +327,33 @@ fun MainScreen(city: Int, cityName: String) {
                         confirmButton = {
                             TextButton(
                                 onClick = {
-                                    viewModel.changeDate(startDate = Date(startDatePickerState.selectedDateMillis.orEmpty()))
+                                    viewModel.changeDate(
+                                        startDate = Date(
+                                            startDatePickerState.selectedDateMillis.orEmpty()
+                                                .toStartOfDay()
+                                        )
+                                    )
+                                    val date = Date(
+                                        startDatePickerState.selectedDateMillis.orEmpty()
+                                            .toStartOfDay()
+                                    )
+                                    println("date - $date")
+                                    println(
+                                        "state.daily.firstOrNull { it.ts.time == startDatePickerState.selectedDateMillis } - ${
+                                            state.daily.firstOrNull {
+                                                it.ts.time == startDatePickerState.selectedDateMillis.orEmpty()
+                                                    .toStartOfDay()
+                                            }
+                                        }"
+                                    )
+                                    state.daily.firstOrNull {
+                                        it.ts.time == startDatePickerState.selectedDateMillis.orEmpty()
+                                            .toStartOfDay()
+                                    }
+                                        ?.let { day ->
+                                            sliderStartState.value =
+                                                state.daily.indexOf(day).toFloat()
+                                        }
                                     openStartDialog = false
                                 },
                                 enabled = confirmEnabled.value
@@ -360,7 +389,20 @@ fun MainScreen(city: Int, cityName: String) {
                         confirmButton = {
                             TextButton(
                                 onClick = {
-                                    viewModel.changeDate(endDate = Date(endDatePickerState.selectedDateMillis.orEmpty()))
+                                    viewModel.changeDate(
+                                        endDate = Date(
+                                            endDatePickerState.selectedDateMillis.orEmpty()
+                                                .toStartOfDay()
+                                        )
+                                    )
+                                    state.daily.firstOrNull {
+                                        it.ts.time == endDatePickerState.selectedDateMillis.orEmpty()
+                                            .toStartOfDay()
+                                    }
+                                        ?.let { day ->
+                                            sliderEndState.value =
+                                                state.daily.indexOf(day).toFloat()
+                                        }
                                     openEndDialog = false
 
                                 },
@@ -383,13 +425,23 @@ fun MainScreen(city: Int, cityName: String) {
                     }
                 }
             } else {
-                Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                Spacer(modifier = Modifier.size(40.dp))
+                Box(modifier = Modifier, contentAlignment = Alignment.Center) {
                     CircularProgressIndicator(
                         modifier = Modifier
                             .align(Alignment.Center)
                             .size(80.dp)
                     )
                 }
+            }
+        } else {
+            Spacer(modifier = Modifier.size(40.dp))
+            Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                CircularProgressIndicator(
+                    modifier = Modifier
+                        .align(Alignment.Center)
+                        .size(80.dp)
+                )
             }
         }
     }
@@ -539,6 +591,17 @@ fun TemperatureGraph(datesByPoints: List<DailyUI>) {
 fun Date.toUI(): String {
     val dateFormat = SimpleDateFormat("dd.MM.yyyy")
     return dateFormat.format(this)
+}
+
+fun Long.toStartOfDay(): Long {
+    val calendar = Calendar.getInstance().apply {
+        timeInMillis = this@toStartOfDay
+        set(Calendar.HOUR_OF_DAY, 0)
+        set(Calendar.MINUTE, 0)
+        set(Calendar.SECOND, 0)
+        set(Calendar.MILLISECOND, 0)
+    }
+    return calendar.timeInMillis
 }
 
 

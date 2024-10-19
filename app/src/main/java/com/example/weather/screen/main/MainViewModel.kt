@@ -29,17 +29,20 @@ class MainViewModel() :
             changeDateRange(points)
         }
     }
-
-    fun changeDate(startDate: Date = state.dateStart, endDate: Date = state.dateEnd) {
+    var jobChangeDate: Job? = null
+    fun changeDate(startDate: Date = state.dateStart, endDate: Date = state.dateEnd, after: () -> Unit= {}) {
         println("endDate - $endDate")
-        viewModelScope.launch {
+        jobChangeDate?.cancel()
+        jobChangeDate= viewModelScope.launch {
+            delay(200L)
             reduce {
                 state.copy(
                     dateStart = startDate,
                     dateEnd = endDate
                 )
             }
-            changeDateRange(startDate = startDate, endDate = endDate)
+            after()
+            changeDateRange(startDate = startDate, endDate = endDate,)
         }
     }
 
