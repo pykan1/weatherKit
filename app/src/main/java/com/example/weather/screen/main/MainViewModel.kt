@@ -2,6 +2,7 @@ package com.example.weather.screen.main
 
 import androidx.lifecycle.viewModelScope
 import com.example.weather.data.api.WeatherService
+import com.example.weather.data.api.launchOperation
 import com.example.weather.di.ApiModule
 import com.example.weather.models.MeasurementTimeRangeUI
 import com.example.weather.models.formatDateToISOString
@@ -21,7 +22,7 @@ class MainViewModel() :
     var jobChangePoint: Job? = null
     fun changePoints(points: Int) {
         jobChangePoint?.cancel()
-        jobChangePoint =  CoroutineScope(Dispatchers.IO).launch {
+        jobChangePoint = CoroutineScope(Dispatchers.IO).launch {
             delay(300L)
             reduce {
                 state.copy(
@@ -31,11 +32,16 @@ class MainViewModel() :
             changeDateRange(points)
         }
     }
+
     var jobChangeDate: Job? = null
-    fun changeDate(startDate: Date = state.dateStart, endDate: Date = state.dateEnd, after: () -> Unit= {}) {
+    fun changeDate(
+        startDate: Date = state.dateStart,
+        endDate: Date = state.dateEnd,
+        after: () -> Unit = {}
+    ) {
         println("endDate - $endDate")
         jobChangeDate?.cancel()
-        jobChangeDate=  CoroutineScope(Dispatchers.IO).launch {
+        jobChangeDate = CoroutineScope(Dispatchers.IO).launch {
             delay(200L)
             reduce {
                 state.copy(
@@ -44,15 +50,19 @@ class MainViewModel() :
                 )
             }
             after()
-            changeDateRange(startDate = startDate, endDate = endDate,)
+            changeDateRange(startDate = startDate, endDate = endDate)
         }
     }
 
     var jobChangeRange: Job? = null
-    fun changeDateRange(points: Int = state.points, endDate: Date = state.dateEnd, startDate: Date = state.dateStart) {
+    fun changeDateRange(
+        points: Int = state.points,
+        endDate: Date = state.dateEnd,
+        startDate: Date = state.dateStart
+    ) {
         println("changeDateRange")
         jobChangeRange?.cancel()
-        jobChangeRange =  CoroutineScope(Dispatchers.IO).launch {
+        jobChangeRange = CoroutineScope(Dispatchers.IO).launch {
             reduce { state.copy(loading = true) }
             delay(300L)
             val dates = generateEqualDates(
@@ -73,7 +83,9 @@ class MainViewModel() :
     fun loadData(city: Int, cityName: String) {
         CoroutineScope(Dispatchers.IO).launch {
             reduce { state.copy(loading = true) }
-            weatherApi.getMeasurementTimeRange(city).body()?.let {
+            launchOperation(call = {
+                weatherApi.getMeasurementTimeRange(city)
+            }) {
                 val measurementTimeRange = it.firstOrNull()?.toUI()
                     ?: MeasurementTimeRangeUI.Default
                 reduce {
@@ -83,17 +95,21 @@ class MainViewModel() :
                         dateEnd = measurementTimeRange.tsMax
                     )
                 }
-                weatherApi.getDailyTemperatures(
-                    city,
-                    measurementTimeRange.tsMin.formatDateToISOString(),
-                    measurementTimeRange.tsMax.formatDateToISOString()
-                ).body()?.let {
-                    reduce {
-                        state.copy(
-                            daily = it.map { it.toUI() },
+                viewModelScope.launch {
+                    launchOperation(call = {
+                        weatherApi.getDailyTemperatures(
+                            city,
+                            measurementTimeRange.tsMin.formatDateToISOString(),
+                            measurementTimeRange.tsMax.formatDateToISOString()
                         )
+                    }) {
+                        reduce {
+                            state.copy(
+                                daily = it.map { it.toUI() },
+                            )
+                        }
+                        changeDateRange()
                     }
-                    changeDateRange()
                 }
             }
         }

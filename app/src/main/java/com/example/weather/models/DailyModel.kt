@@ -25,3 +25,9 @@ fun DailyResponse.toUI(): DailyUI {
         temperature = temperature.orEmpty()
     )
 }
+
+fun Double?.orEmpty(): Double = this ?: 0.0
+
+fun Int?.orEmpty(): Int = this ?: 0
+
+fun Long?.orEmpty(): Long = this ?: 0

@@ -3,38 +3,6 @@ package com.example.weather.models
 import java.util.Calendar
 import java.util.Date
 
-data class CoastlineResponse(
-    val shape: Int?,
-    val segment: Int?,
-    val latitude: Double?,
-    val longitude: Double?
-)
-
-data class CoastlineUI(
-    val shape: Int,
-    val segment: Int,
-    val latitude: Double,
-    val longitude: Double
-) {
-    companion object {
-        val Default = CoastlineUI(
-            0, 0, 0.0, 0.0
-        )
-    }
-}
-
-fun Double?.orEmpty(): Double = this ?: 0.0
-
-fun Int?.orEmpty(): Int = this ?: 0
-
-fun Long?.orEmpty(): Long = this ?: 0
-
-fun CoastlineResponse.toUI(): CoastlineUI {
-    return CoastlineUI(
-        shape.orEmpty(), segment.orEmpty(), latitude.orEmpty(), longitude.orEmpty()
-    )
-}
-
 fun generateEqualDates(
     allDays: List<DailyUI>,
     dateFrom: Date,
