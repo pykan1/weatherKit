@@ -52,6 +52,8 @@ import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.Path
+import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.lerp
 import androidx.compose.ui.graphics.nativeCanvas
 import androidx.compose.ui.text.drawText
@@ -465,38 +467,20 @@ fun TemperatureGraph(datesByPoints: List<DailyUI>) {
         it + (5 - it % 5) // Округление вверх до ближайшего кратного 5
     } ?: 0.0
 
-    val state = rememberLazyListState()
-    val pointWidth = 30.dp
-
-    // Формат для отображения даты на оси X
     val dateFormat = SimpleDateFormat("dd.MM.yyyy")
-
-    LaunchedEffect(datesByPoints) {
-        if (datesByPoints.isNotEmpty()) {
-            state.animateScrollToItem(datesByPoints.size - 1)
-        }
-    }
-
-    // Определяем количество шагов по Y с шагом 5
     val steps = ceil(((maxTemp - minTemp) / 5)).toInt()
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .animateContentSize()
-    ) {
-        // Ось Y с подписями температур
+    val canvasHeight = 300.dp
+    val visibleLabelsCount = 10 // Количество отображаемых меток на оси X
+
+    Row {
         Canvas(
-            modifier = Modifier.padding(top = pointWidth)
-                .fillMaxHeight()
-                .width(40.dp)
-                .height(pointWidth * steps)
+            modifier = Modifier
+                .height(canvasHeight).width(40.dp)
         ) {
             val yStep = size.height / steps
-
             for (i in 0..steps) {
                 val temp = minTemp + i * 5
                 val yOffset = size.height - i * yStep
-
                 drawContext.canvas.nativeCanvas.apply {
                     drawText(
                         "${temp}°C",
@@ -511,100 +495,70 @@ fun TemperatureGraph(datesByPoints: List<DailyUI>) {
             }
         }
 
-        // Основной график
-        LazyRow(
-            state = state,
+        Canvas(
             modifier = Modifier
-                .fillMaxWidth()
-                .height(pointWidth * steps + 80.dp) // Высота увеличена для осей
+                .weight(1f)
+                .height(canvasHeight)
         ) {
-            items(datesByPoints.size) { index ->
-                val point = datesByPoints[index]
-                val nextPoint = datesByPoints.getOrNull(index + 1)
+            val temperatureRange = maxTemp - minTemp
+            val xStep = size.width / datesByPoints.size
+            val path = Path()
 
-                Box(modifier = Modifier.height(pointWidth * steps + 80.dp)) {
-                    Canvas(modifier = Modifier.size(pointWidth, pointWidth)) {
-                        // Рассчитываем цвет температуры (градиент от синего к красному)
-                        val tempRatio =
-                            ((point.temperature - minTemp) / (maxTemp - minTemp)).toFloat()
-                        val color = lerp(Color.Blue, Color.Red, tempRatio)
+            val startY = (size.height * (1 - (datesByPoints[0].temperature - minTemp) / temperatureRange)).toFloat()
+            path.moveTo(0f, startY)
 
-                        // Рисуем прямоугольник
-                        drawRect(
-                            color = color,
-                            size = Size(size.width, size.height)
+            for (index in 1 until datesByPoints.size) {
+                val currentPoint = datesByPoints[index]
+                val prevPoint = datesByPoints[index - 1]
+                val prevX = (index - 1) * xStep
+                val currentX = index * xStep
+
+                // Расчёт Y-координат
+                val prevY = size.height * (1 - (prevPoint.temperature - minTemp) / temperatureRange.toFloat())
+                val currentY = size.height * (1 - (currentPoint.temperature - minTemp) / temperatureRange.toFloat())
+
+                // Добавление квадратичной кривой Безье для плавности
+                val controlX = (prevX + currentX) / 2
+                val controlY = (prevY + currentY) / 2
+                path.quadraticBezierTo(controlX, controlY.toFloat(), currentX, currentY.toFloat())
+            }
+
+            // Рисуем сам график
+            drawPath(
+                path = path,
+                color = Color.Blue,
+                style = Stroke(width = 4f)
+            )
+
+            // Отображаем даты на оси X
+            val labelStep = datesByPoints.size / visibleLabelsCount
+            for (i in 0 until visibleLabelsCount) {
+                val index = i * labelStep
+                if (index < datesByPoints.size) {
+                    val point = datesByPoints[index]
+                    val xPosition = index * xStep
+                    drawContext.canvas.nativeCanvas.apply {
+                        save()
+                        rotate(90f, xPosition, size.height + 30f)
+                        drawText(
+                            dateFormat.format(point.ts),
+                            xPosition,
+                            size.height + 30f,
+                            android.graphics.Paint().apply {
+                                color = android.graphics.Color.BLACK
+                                textSize = 24f
+                                textAlign = android.graphics.Paint.Align.CENTER
+                            }
                         )
-                    }
-                    Canvas(
-                        modifier = Modifier.padding(top = pointWidth).size(pointWidth, pointWidth * steps)
-                    ) {
-                        // Правильное позиционирование точки на графике
-                        val temperatureRange = maxTemp - minTemp
-                        val yPosition =
-                            size.height * (1 - (point.temperature - minTemp) / temperatureRange.toFloat())
-
-                        // Рисуем сетку
-                        val gridLineCount = steps
-                        val step = size.height / gridLineCount
-
-                        for (i in 0 until gridLineCount) {
-                            drawLine(
-                                color = Color.Gray,
-                                start = Offset(0f, i * step),
-                                end = Offset(size.width, i * step),
-                                strokeWidth = 1f
-                            )
-                        }
-
-                        drawLine(
-                            color = Color.Gray,
-                            start = Offset(size.width / 2, 0f),
-                            end = Offset(size.width / 2, size.height),
-                            strokeWidth = 1f
-                        )
-
-                        // Рисуем точку
-                        drawCircle(
-                            color = Color.Red,
-                            radius = 6f,
-                            center = Offset(size.width / 2, yPosition.toFloat())
-                        )
-
-                        nextPoint?.let {
-                            val nextYPosition =
-                                size.height * (1 - (it.temperature - minTemp) / temperatureRange.toFloat())
-                            drawLine(
-                                color = Color.Blue,
-                                start = Offset(size.width / 2, yPosition.toFloat()),
-                                end = Offset(
-                                    size.width + pointWidth.toPx() / 2,
-                                    nextYPosition.toFloat()
-                                ),
-                                strokeWidth = 4f
-                            )
-                        }
-
-                        drawContext.canvas.nativeCanvas.apply {
-                            save()
-                            rotate(90f, size.width / 2, size.height + 70f)
-                            drawText(
-                                dateFormat.format(point.ts),
-                                size.width / 2,
-                                size.height + 70f,
-                                android.graphics.Paint().apply {
-                                    color = android.graphics.Color.BLACK
-                                    textSize = 24f
-                                    textAlign = android.graphics.Paint.Align.CENTER
-                                }
-                            )
-                            restore()
-                        }
+                        restore()
                     }
                 }
             }
         }
     }
 }
+
+
 
 
 fun Date.toUI(): String {
