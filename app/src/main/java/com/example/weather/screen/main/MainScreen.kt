@@ -467,7 +467,7 @@ fun TemperatureGraph(datesByPoints: List<DailyUI>) {
         it + (5 - it % 5) // Округление вверх до ближайшего кратного 5
     } ?: 0.0
 
-    val dateFormat = SimpleDateFormat("dd.MM.yyyy")
+    val dateFormat = SimpleDateFormat("yyyy") // Изменено на год
     val steps = ceil(((maxTemp - minTemp) / 5)).toInt()
     val canvasHeight = 300.dp
     val visibleLabelsCount = 10 // Количество отображаемых меток на оси X
@@ -475,7 +475,8 @@ fun TemperatureGraph(datesByPoints: List<DailyUI>) {
     Row {
         Canvas(
             modifier = Modifier
-                .height(canvasHeight).width(40.dp)
+                .height(canvasHeight)
+                .width(40.dp)
         ) {
             val yStep = size.height / steps
             for (i in 0..steps) {
@@ -492,6 +493,14 @@ fun TemperatureGraph(datesByPoints: List<DailyUI>) {
                         }
                     )
                 }
+
+                // Рисуем горизонтальные линии сетки
+                drawLine(
+                    color = Color.LightGray,
+                    start = Offset(0f, yOffset),
+                    end = Offset(size.width, yOffset),
+                    strokeWidth = 1f
+                )
             }
         }
 
@@ -523,14 +532,7 @@ fun TemperatureGraph(datesByPoints: List<DailyUI>) {
                 path.quadraticBezierTo(controlX, controlY.toFloat(), currentX, currentY.toFloat())
             }
 
-            // Рисуем сам график
-            drawPath(
-                path = path,
-                color = Color.Blue,
-                style = Stroke(width = 4f)
-            )
-
-            // Отображаем даты на оси X
+            // Отображаем годы на оси X
             val labelStep = datesByPoints.size / visibleLabelsCount
             for (i in 0 until visibleLabelsCount) {
                 val index = i * labelStep
@@ -554,9 +556,54 @@ fun TemperatureGraph(datesByPoints: List<DailyUI>) {
                     }
                 }
             }
+
+            // Рисуем градиентный фон
+            datesByPoints.forEachIndexed { index, point ->
+                val tempRatio = (point.temperature - minTemp) / temperatureRange.toFloat()
+                val color = lerp(Color.Blue, Color.Red, tempRatio.toFloat())
+
+                drawRect(
+                    color = color,
+                    topLeft = Offset(index * xStep, 0f),
+                    size = Size(xStep, size.height)
+                )
+            }
+
+            // Рисуем горизонтальные линии сетки
+            val yStep = size.height / steps
+            for (i in 0..steps) {
+                val yOffset = size.height - i * yStep
+                drawLine(
+                    color = Color.LightGray,
+                    start = Offset(0f, yOffset),
+                    end = Offset(size.width, yOffset),
+                    strokeWidth = 1f
+                )
+            }
+
+            // Рисуем вертикальные линии сетки только для отображаемых дат
+            for (i in 0 until visibleLabelsCount) {
+                val index = i * labelStep
+                if (index < datesByPoints.size) {
+                    val xPosition = index * xStep
+                    drawLine(
+                        color = Color.LightGray,
+                        start = Offset(xPosition, 0f),
+                        end = Offset(xPosition, size.height),
+                        strokeWidth = 1f
+                    )
+                }
+            }
+            // Рисуем сам график
+            drawPath(
+                path = path,
+                color = Color.Black,
+                style = Stroke(width = 4f)
+            )
         }
     }
 }
+
 
 
 
