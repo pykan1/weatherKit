@@ -2,6 +2,7 @@ package com.example.weather.screen.main
 
 import androidx.compose.animation.animateContentSize
 import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.PressInteraction
@@ -21,9 +22,12 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.selection.selectable
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.DateRange
+import androidx.compose.material.icons.filled.KeyboardArrowDown
+import androidx.compose.material.icons.filled.KeyboardArrowUp
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.DatePicker
 import androidx.compose.material3.DatePickerDialog
@@ -31,6 +35,7 @@ import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.RadioButton
 import androidx.compose.material3.SegmentedButtonDefaults.Icon
 import androidx.compose.material3.Slider
 import androidx.compose.material3.SliderState
@@ -45,12 +50,14 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.drawscope.Stroke
@@ -68,6 +75,7 @@ import java.text.SimpleDateFormat
 import java.time.Instant
 import java.util.Calendar
 import java.util.Date
+import java.util.Locale
 import kotlin.math.abs
 import kotlin.math.ceil
 import kotlin.math.min
@@ -78,10 +86,11 @@ import kotlin.math.roundToInt
 fun MainScreen(city: Int, cityName: String) {
     val viewModel: MainViewModel = viewModel()
     val state by viewModel.stateFlow.collectAsState()
-    var sliderValue by remember { mutableFloatStateOf(20f) }
+    var sliderValue by remember { mutableFloatStateOf(100f) }
     var openStartDialog by remember {
         mutableStateOf(false)
     }
+    var selectedScheme by rememberSaveable() { mutableStateOf(Pair(Color.Blue, Color.Red)) }
     var openEndDialog by remember {
         mutableStateOf(false)
     }
@@ -183,7 +192,9 @@ fun MainScreen(city: Int, cityName: String) {
                 Spacer(modifier = Modifier.size(20.dp))
 
                 if (!state.loading) {
-                    TemperatureGraph(datesByPoints = state.datesByPoints)
+                    TemperatureGraph(datesByPoints = state.datesByPoints, selectedScheme) {
+                        selectedScheme = it
+                    }
                 } else {
                     Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                         CircularProgressIndicator(
@@ -194,7 +205,7 @@ fun MainScreen(city: Int, cityName: String) {
                     }
                 }
 
-                Spacer(modifier = Modifier.size(20.dp))
+                Spacer(modifier = Modifier.size(40.dp))
 
                 Row(
                     verticalAlignment = Alignment.CenterVertically,
@@ -457,155 +468,279 @@ fun MainScreen(city: Int, cityName: String) {
 
 }
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun TemperatureGraph(datesByPoints: List<DailyUI>) {
+fun TemperatureGraph(
+    datesByPoints: List<DailyUI>,
+    selectedScheme: Pair<Color, Color>,
+    changeSelectedScheme: (Pair<Color, Color>) -> Unit
+) {
     val minTemp = datesByPoints.minOfOrNull { it.temperature }?.let {
-        it - (it % 5) - 5 // Округление вниз до ближайшего кратного 5
+        it - (it % 5) - 5
     } ?: 0.0
 
     val maxTemp = datesByPoints.maxOfOrNull { it.temperature }?.let {
-        it + (5 - it % 5) // Округление вверх до ближайшего кратного 5
+        it + (5 - it % 5)
     } ?: 0.0
 
-    val dateFormat = SimpleDateFormat("yyyy") // Изменено на год
+    val startDate = datesByPoints.first().ts
+    val endDate = datesByPoints.last().ts
+    val yearsDiff = endDate.year - startDate.year
+
+    // Определяем visibleLabelsCount в зависимости от временного диапазона
+    val (visibleLabelsCount, interval) = when {
+        yearsDiff >= 8 -> yearsDiff to Calendar.YEAR
+        yearsDiff >= 5 -> yearsDiff * 2 to Calendar.MONTH // Полугодия
+        yearsDiff >= 1.5 -> yearsDiff * 4 to Calendar.MONTH // Кварталы
+        else -> yearsDiff * 12 to Calendar.MONTH // Месяцы
+    }
+
+    val dateFormat = when (interval) {
+        Calendar.YEAR -> SimpleDateFormat("yyyy", Locale.getDefault())
+        Calendar.MONTH -> SimpleDateFormat("MMM yyyy", Locale.getDefault())
+        else -> SimpleDateFormat("yyyy", Locale.getDefault())
+    }
+
+    // Остальная часть функции остается прежней
     val steps = ceil(((maxTemp - minTemp) / 5)).toInt()
     val canvasHeight = 300.dp
-    val visibleLabelsCount = 10 // Количество отображаемых меток на оси X
+    var isOpen by remember { mutableStateOf(false) }
 
-    Row {
-        Canvas(
+    Column {
+        Row(
             modifier = Modifier
-                .height(canvasHeight)
-                .width(40.dp)
+                .fillMaxWidth()
+                .padding(horizontal = 16.dp),
+            verticalAlignment = Alignment.CenterVertically
         ) {
-            val yStep = size.height / steps
-            for (i in 0..steps) {
-                val temp = minTemp + i * 5
-                val yOffset = size.height - i * yStep
-                drawContext.canvas.nativeCanvas.apply {
-                    drawText(
-                        "${temp}°C",
-                        5f,
-                        yOffset,
-                        android.graphics.Paint().apply {
-                            color = android.graphics.Color.BLACK
-                            textSize = 30f
-                        }
+            Text("Color scheme")
+            IconButton(modifier = Modifier.size(40.dp), onClick = {
+                isOpen = !isOpen
+            }) {
+                Icon(active = isOpen, activeContent = {
+                    androidx.compose.material3.Icon(
+                        imageVector = Icons.Default.KeyboardArrowUp,
+                        contentDescription = null,
+                        modifier = Modifier.size(24.dp)
                     )
-                }
-
-                // Рисуем горизонтальные линии сетки
-                drawLine(
-                    color = Color.LightGray,
-                    start = Offset(0f, yOffset),
-                    end = Offset(size.width, yOffset),
-                    strokeWidth = 1f
+                }, inactiveContent = {
+                    androidx.compose.material3.Icon(
+                        imageVector = Icons.Default.KeyboardArrowDown,
+                        contentDescription = null,
+                        modifier = Modifier.size(24.dp)
+                    )
+                })
+            }
+        }
+        Row(modifier = Modifier.animateContentSize()) {
+            val colors = listOf<Pair<Color, Color>>(
+                Pair(Color.Blue, Color.Red),
+                Pair(Color(0xFFebe4f4), Color(0xFF4c0a28)),
+                Pair(Color(0xFFebe4f4), Color(0xFF520565)),
+                Pair(Color(0xFFe2efef), Color(0xFF680661)),
+                Pair(Color(0xFFeaf5e6), Color(0xFF0a4264)),
+                Pair(Color(0xFFe2e0eb), Color(0xFF064258)),
+                Pair(Color(0xFFe9f7b9), Color(0xFF12276c)),
+                Pair(Color(0xFFe7e6ec), Color(0xFF014e3b)),
+                Pair(Color(0xFFddefeb), Color(0xFF0c4624)),
+                Pair(Color(0xFFf3fcc5), Color(0xFF06492f)),
+            )
+            val splitList = splitArray(colors)
+            if (isOpen) {
+                ColorOption(
+                    modifier = Modifier.weight(1f),
+                    selectedScheme,
+                    colors = splitList.first,
+                    onColorChange = changeSelectedScheme
+                )
+                Spacer(Modifier.width(16.dp))
+                ColorOption(
+                    modifier = Modifier.weight(1f),
+                    selectedScheme,
+                    colors = splitList.second,
+                    onColorChange = changeSelectedScheme
                 )
             }
         }
+        Row {
+            Spacer(Modifier.size(40.dp))
+            Canvas(
+                modifier = Modifier.weight(1f)
+            ) {
+                val xStep = size.width / datesByPoints.size
+                val temperatureRange = maxTemp - minTemp
 
-        Canvas(
-            modifier = Modifier
-                .weight(1f)
-                .height(canvasHeight)
-        ) {
-            val temperatureRange = maxTemp - minTemp
-            val xStep = size.width / datesByPoints.size
-            val path = Path()
+                datesByPoints.forEachIndexed { index, point ->
+                    val tempRatio = (point.temperature - minTemp) / temperatureRange.toFloat()
+                    val color =
+                        lerp(selectedScheme.first, selectedScheme.second, tempRatio.toFloat())
 
-            val startY = (size.height * (1 - (datesByPoints[0].temperature - minTemp) / temperatureRange)).toFloat()
-            path.moveTo(0f, startY)
-
-            for (index in 1 until datesByPoints.size) {
-                val currentPoint = datesByPoints[index]
-                val prevPoint = datesByPoints[index - 1]
-                val prevX = (index - 1) * xStep
-                val currentX = index * xStep
-
-                // Расчёт Y-координат
-                val prevY = size.height * (1 - (prevPoint.temperature - minTemp) / temperatureRange.toFloat())
-                val currentY = size.height * (1 - (currentPoint.temperature - minTemp) / temperatureRange.toFloat())
-
-                // Добавление квадратичной кривой Безье для плавности
-                val controlX = (prevX + currentX) / 2
-                val controlY = (prevY + currentY) / 2
-                path.quadraticBezierTo(controlX, controlY.toFloat(), currentX, currentY.toFloat())
+                    drawRect(
+                        color = color,
+                        topLeft = Offset(index * xStep, 0f),
+                        size = Size(xStep, 40f)
+                    )
+                }
             }
-
-            // Отображаем годы на оси X
-            val labelStep = datesByPoints.size / visibleLabelsCount
-            for (i in 0 until visibleLabelsCount) {
-                val index = i * labelStep
-                if (index < datesByPoints.size) {
-                    val point = datesByPoints[index]
-                    val xPosition = index * xStep
+        }
+        Row {
+            Canvas(
+                modifier = Modifier
+                    .height(canvasHeight)
+                    .width(40.dp)
+            ) {
+                val yStep = size.height / steps
+                for (i in 0..steps) {
+                    val temp = minTemp + i * 5
+                    val yOffset = size.height - i * yStep
                     drawContext.canvas.nativeCanvas.apply {
-                        save()
-                        rotate(90f, xPosition, size.height + 30f)
                         drawText(
-                            dateFormat.format(point.ts),
-                            xPosition,
-                            size.height + 30f,
+                            "${temp}°C",
+                            5f,
+                            yOffset,
                             android.graphics.Paint().apply {
                                 color = android.graphics.Color.BLACK
-                                textSize = 24f
-                                textAlign = android.graphics.Paint.Align.CENTER
+                                textSize = 30f
                             }
                         )
-                        restore()
                     }
                 }
             }
 
-            // Рисуем градиентный фон
-            datesByPoints.forEachIndexed { index, point ->
-                val tempRatio = (point.temperature - minTemp) / temperatureRange.toFloat()
-                val color = lerp(Color.Blue, Color.Red, tempRatio.toFloat())
+            Canvas(
+                modifier = Modifier
+                    .weight(1f)
+                    .height(canvasHeight)
+            ) {
+                val temperatureRange = maxTemp - minTemp
+                val xStep = size.width / datesByPoints.size
+                val path = Path()
 
-                drawRect(
-                    color = color,
-                    topLeft = Offset(index * xStep, 0f),
-                    size = Size(xStep, size.height)
-                )
-            }
+                val startY =
+                    (size.height * (1 - (datesByPoints[0].temperature - minTemp) / temperatureRange)).toFloat()
+                path.moveTo(0f, startY)
 
-            // Рисуем горизонтальные линии сетки
-            val yStep = size.height / steps
-            for (i in 0..steps) {
-                val yOffset = size.height - i * yStep
-                drawLine(
-                    color = Color.LightGray,
-                    start = Offset(0f, yOffset),
-                    end = Offset(size.width, yOffset),
-                    strokeWidth = 1f
-                )
-            }
+                for (index in 1 until datesByPoints.size) {
+                    val currentPoint = datesByPoints[index]
+                    val prevPoint = datesByPoints[index - 1]
+                    val prevX = (index - 1) * xStep
+                    val currentX = index * xStep
 
-            // Рисуем вертикальные линии сетки только для отображаемых дат
-            for (i in 0 until visibleLabelsCount) {
-                val index = i * labelStep
-                if (index < datesByPoints.size) {
-                    val xPosition = index * xStep
+                    val prevY =
+                        size.height * (1 - (prevPoint.temperature - minTemp) / temperatureRange.toFloat())
+                    val currentY =
+                        size.height * (1 - (currentPoint.temperature - minTemp) / temperatureRange.toFloat())
+
+                    val controlX = (prevX + currentX) / 2
+                    val controlY = (prevY + currentY) / 2
+                    path.quadraticBezierTo(
+                        controlX,
+                        controlY.toFloat(),
+                        currentX,
+                        currentY.toFloat()
+                    )
+                }
+
+                val labelStep = datesByPoints.size / visibleLabelsCount
+                for (i in 0 until visibleLabelsCount) {
+                    val index = i * labelStep
+                    if (index < datesByPoints.size) {
+                        val point = datesByPoints[index]
+                        val xPosition = index * xStep
+                        drawContext.canvas.nativeCanvas.apply {
+                            val text = dateFormat.format(point.ts)
+                            save()
+                            rotate(90f, xPosition, size.height + (text.length*7.5).toFloat())
+                            drawText(
+                                text,
+                                xPosition,
+                                size.height + 30f,
+                                android.graphics.Paint().apply {
+                                    color = android.graphics.Color.BLACK
+                                    textSize = 24f
+                                    textAlign = android.graphics.Paint.Align.CENTER
+                                }
+                            )
+                            restore()
+                        }
+                    }
+                }
+
+                val yStep = size.height / steps
+                for (i in 0..steps) {
+                    val yOffset = size.height - i * yStep
                     drawLine(
                         color = Color.LightGray,
-                        start = Offset(xPosition, 0f),
-                        end = Offset(xPosition, size.height),
+                        start = Offset(0f, yOffset),
+                        end = Offset(size.width, yOffset),
                         strokeWidth = 1f
                     )
                 }
+
+                for (i in 0 until visibleLabelsCount) {
+                    val index = i * labelStep
+                    if (index < datesByPoints.size) {
+                        val xPosition = index * xStep
+                        drawLine(
+                            color = Color.LightGray,
+                            start = Offset(xPosition, 0f),
+                            end = Offset(xPosition, size.height),
+                            strokeWidth = 1f
+                        )
+                    }
+                }
+
+                drawPath(
+                    path = path,
+                    color = Color.Black,
+                    style = Stroke(width = 4f)
+                )
             }
-            // Рисуем сам график
-            drawPath(
-                path = path,
-                color = Color.Black,
-                style = Stroke(width = 4f)
-            )
         }
     }
 }
 
 
-
+// Helper Composable for color selection
+@Composable
+fun ColorOption(
+    modifier: Modifier = Modifier,
+    selectedColor: Pair<Color, Color>,
+    colors: List<Pair<Color, Color>>,
+    onColorChange: (Pair<Color, Color>) -> Unit
+) {
+    Column(modifier) {
+        colors.forEach { color ->
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .selectable(
+                        selected = (selectedColor == color),
+                        onClick = { onColorChange(color) }
+                    ),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                RadioButton(
+                    selected = (selectedColor == color),
+                    onClick = { onColorChange(color) }
+                )
+                Spacer(modifier = Modifier.size(8.dp))
+                Box(
+                    modifier = Modifier
+                        .size(height = 24.dp, width = 80.dp)
+                        .background(
+                            brush = Brush.horizontalGradient(
+                                colors = listOf(
+                                    color.first,
+                                    color.second
+                                )
+                            )
+                        )
+                )
+            }
+        }
+    }
+}
 
 
 fun Date.toUI(): String {
@@ -624,4 +759,10 @@ fun Long.toStartOfDay(): Long {
     return calendar.timeInMillis
 }
 
+fun <T> splitArray(array: List<T>): Pair<List<T>, List<T>> {
+    val middleIndex = array.size / 2
+    val firstPart = array.take(middleIndex)
+    val secondPart = array.drop(middleIndex)
+    return Pair(firstPart, secondPart)
+}
 
