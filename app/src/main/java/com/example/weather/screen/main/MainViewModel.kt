@@ -4,6 +4,7 @@ import androidx.lifecycle.viewModelScope
 import com.example.weather.data.api.WeatherService
 import com.example.weather.data.api.launchOperation
 import com.example.weather.di.ApiModule
+import com.example.weather.ip
 import com.example.weather.models.MeasurementTimeRangeUI
 import com.example.weather.models.formatDateToISOString
 import com.example.weather.models.generateEqualDates
@@ -18,7 +19,7 @@ import java.util.Date
 
 class MainViewModel() :
     BaseViewModel<MainState>(MainState.InitState) {
-    private val weatherApi: WeatherService = ApiModule.provideApi()
+    private val weatherApi: WeatherService = ApiModule.provideApi(ip)
     var jobChangePoint: Job? = null
     fun changePoints(points: Int) {
         jobChangePoint?.cancel()

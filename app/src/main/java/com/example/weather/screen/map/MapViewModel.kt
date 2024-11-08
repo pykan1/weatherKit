@@ -4,6 +4,7 @@ import androidx.lifecycle.viewModelScope
 import com.example.weather.data.api.WeatherService
 import com.example.weather.data.api.launchOperation
 import com.example.weather.di.ApiModule
+import com.example.weather.ip
 import com.example.weather.models.CityUi
 import com.example.weather.models.CountryUi
 import com.example.weather.models.MeasurementTimeRangeUI
@@ -13,9 +14,9 @@ import com.example.weather.models.toUi
 import com.example.weather.screen.base.BaseViewModel
 import kotlinx.coroutines.launch
 
-class MapViewModel: BaseViewModel<MapState>(MapState.InitState){
+class MapViewModel(): BaseViewModel<MapState>(MapState.InitState){
 
-    private val api = ApiModule.provideApi()
+    private val api = ApiModule.provideApi(ip)
 
     fun loadData(){
         viewModelScope.launch {
