@@ -485,7 +485,7 @@ fun TemperatureGraph(
 
     val startDate = datesByPoints.first().ts
     val endDate = datesByPoints.last().ts
-    val yearsDiff = endDate.year - startDate.year
+    val yearsDiff = (endDate.year - startDate.year).let { if (it == 0) 1 else it }
 
     // Определяем visibleLabelsCount в зависимости от временного диапазона
     val (visibleLabelsCount, interval) = when {
@@ -650,11 +650,11 @@ fun TemperatureGraph(
                         drawContext.canvas.nativeCanvas.apply {
                             val text = dateFormat.format(point.ts)
                             save()
-                            rotate(90f, xPosition, size.height + (text.length*7.5).toFloat())
+                            rotate(90f, xPosition, size.height + (text.length * 7.5).toFloat())
                             drawText(
                                 text,
                                 xPosition,
-                                size.height + 30f,
+                                size.height + (text.length * 7.5).toFloat(),
                                 android.graphics.Paint().apply {
                                     color = android.graphics.Color.BLACK
                                     textSize = 24f

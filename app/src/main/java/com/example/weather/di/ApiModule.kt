@@ -7,7 +7,7 @@ import retrofit2.converter.gson.GsonConverterFactory
 object ApiModule {
 
     fun provideApi(): WeatherService {
-        return Retrofit.Builder().baseUrl("http://192.168.0.120:3000").addConverterFactory(
+        return Retrofit.Builder().baseUrl("http://192.168.123.25:3000").addConverterFactory(
             GsonConverterFactory.create())
             .build().create(WeatherService::class.java)
     }
